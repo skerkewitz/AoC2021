@@ -2,7 +2,7 @@
 filename = "input/day05-real.txt"
 
 defmodule Day05 do
-	def split_str_to_int(s, pattern) do String.split(s, pattern, trim: true) |> Enum.map(&(String.to_integer(&1))) end
+	def split_str_to_int(s, pattern), do: String.split(s, pattern, trim: true) |> Enum.map(&String.to_integer/1)
 	def sign(n) do if n > 0, do: 1, else: -1 end
 
 	def gen_diagonal_coords_from_endpoints_part([x1, y1], [x2, y2]) do
