@@ -4,6 +4,7 @@ filename = "input/day09-real.txt"
 defmodule Day09 do
 	def ascii_to_digit(ascii) when ascii >= 48 and ascii < 58, do: ascii - 48
 
+	@spec get_at(integer, integer, integer) :: boolean
 	def get_at(array, x, y) do
 		if (x < 0 or y < 0) do
 			nil
@@ -12,13 +13,16 @@ defmodule Day09 do
 		end
 	end
 
-	def is_lowpoint?(a, x, y) do
+	def is_lowpoint(a, x, y) do
 		[{0, -1}, {-1, 0}, {1, 0}, {0, 1}]
 		|> Enum.map(fn {j, k} -> get_at(a, x + j, y + k) end)
 		|> Enum.filter(fn e -> e != nil end)
 		|> Enum.all?(fn e -> e > get_at(a, x, y) end)
 	end
 
+	# ::L = ::List<::integer*>
+	# %l = ::List<::L*>
+	# %visited = ::Set<{::integer, ::integer}>
 	def basin_rec(l, {x, y}, visited) do
 		if MapSet.member?(visited, {x, y}) do
 			{visited, []} # already checked
@@ -50,7 +54,7 @@ low_points = for y <- 0..len_y - 1 do
               for x <- 0..len_x - 1, do: {x, y, Day09.get_at(input, x, y)}
              end
              |> List.flatten()
-             |> Enum.filter(fn {x, y, _} -> Day09.is_lowpoint?(input, x, y) end)
+             |> Enum.filter(fn {x, y, _} -> Day09.is_lowpoint(input, x, y) end)
 
 #Part 1
 low_points
@@ -61,5 +65,5 @@ low_points
 #Part 2
 low_points
 |> Enum.map(fn {x, y, _} -> MapSet.size(Day09.basin(input, ({x, y}))) end)
-|> Enum.sort(&(&1 >= &2)) |> Enum.take(3) |> Enum.reduce(1, fn e, a -> e * a end)
+|> Enum.sort(:desc) |> Enum.take(3) |> Enum.reduce(1, fn e, a -> e * a end)
 |> IO.inspect(label: "Result 2")
