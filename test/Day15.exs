@@ -41,8 +41,8 @@ defmodule DataMap do
 		          {-1,  0},          {1,  0},
                     		{0,  1},            ]
 
-	def possible_next_steps(data_map, {x,y}) do
-		{max_x, max_y} = get_size(data_map)
+	def possible_next_steps(data_map, {x,y}, {max_x, max_y}) do
+		#{max_x, max_y} = get_size(data_map)
 
 		Enum.map(@offsets, fn {xo, yo} -> {x + xo, y + yo} end)
 		|> Enum.filter(fn {xp, yp} -> xp >= 0 and yp >= 0 and xp <= max_x and yp <= max_y end)
@@ -58,17 +58,17 @@ defmodule Day15 do
 		str_list |> Enum.map(fn s -> to_charlist(s) end)
 	end
 
-	def move_cost(data_map, {from_x, from_y}) do
-		fields = DataMap.possible_next_steps(data_map, {from_x, from_y})
+	def move_cost(data_map, {from_x, from_y}, data_map_size) do
+		fields = DataMap.possible_next_steps(data_map, {from_x, from_y}, data_map_size)
 		|> Enum.map(fn {tx, ty} -> {{tx, ty}, data_map[{tx, ty}]} end)
 	end
 
 
 	# path is {cost, visited_fields}
-	def extend_path(data_map, {path_cost, path_field}, cost_map) do
+	def extend_path(data_map, {path_cost, path_field, path_len}, cost_map, data_map_size) do
 
 		# Possible next steps
-		move_cost(data_map, path_field)
+		move_cost(data_map, path_field, data_map_size)
 		|> Enum.filter(fn {target_pos, target_cost} ->
 
 				# do we have already a cost for this field?
@@ -79,26 +79,25 @@ defmodule Day15 do
 		 end)
 
 		# Create a list of all the known paths
-		|> Enum.map(fn {{tx, ty}, c} -> {path_cost + c, {tx, ty}} end)
+		|> Enum.map(fn {{tx, ty}, c} -> {path_cost + c, {tx, ty}, path_len + 1} end)
 	end
 
-	def merge_path_into_list(path_list, path) do
+	def merge_path_into_list(path_list, new_path) do
+		{new_path_cost, new_path_field, new_path_len} = new_path
 
-		path_hit = Enum.find(path_list, fn {_, visited_fields} ->
-			{_, new_path_visited_field} = path
-      new_path_visited_field == visited_fields
+		path_hit = Enum.find(path_list, fn {_, visited_fields, _} ->
+      new_path_field == visited_fields
 		end)
 
 		if path_hit == nil do
 			# Path not known yet, add to list
-			[path | path_list]
+			[new_path | path_list]
 		else
 			{existing_path_cost, _} = path_hit
-			{new_path_cost, _} = path
 			if new_path_cost < existing_path_cost do
 				# New path is shorter, replace in list
 				path_list = List.delete(path_list, path_hit)
-				[path | path_list]
+				[new_path | path_list]
 			else
 				# New path is longer, ignore
 				path_list
@@ -114,29 +113,27 @@ defmodule Day15 do
 	end
 
 	def sort_path(paths, target) do
-		sorted_path = Enum.sort(paths, fn {c1, pf1}, {c2, pf2} ->
+		sorted_path = Enum.sort(paths, fn {c1, pf1, l1}, {c2, pf2, l2} ->
 			if c1 < c2 do
 				true
 			else
 				if c1 > c2 do
 					false
 				else
-					d1 = distance(pf1, target)
-					d2 = distance(pf2, target)
-					d1 < d2
+					l1 < l2
 				end
       end
 		end)
 	end
 
-	def find_path(data_map, paths, cost_map) do
+	def find_path(data_map, paths, cost_map, data_map_size) do
 
 		#sorted_path = Enum.sort(paths, fn {c1, _}, {c2, _} -> c1 < c2 end)
 		shorted_path = hd(paths)
-		new_path = extend_path(data_map, shorted_path, cost_map) #|> IO.inspect(label: "Extend")
+		new_path = extend_path(data_map, shorted_path, cost_map, data_map_size) #|> IO.inspect(label: "Extend")
 
 		# Update checked fields
-		updated_cost_map = new_path |> Enum.map(fn {c, path_field} -> {path_field, c} end) |> Enum.into(cost_map) #|> IO.inspect(label: "Cost map")
+		updated_cost_map = new_path |> Enum.map(fn {c, path_field, _} -> {path_field, c} end) |> Enum.into(cost_map) #|> IO.inspect(label: "Cost map")
 
 
 		# Remove shortest path from path
@@ -146,19 +143,19 @@ defmodule Day15 do
 		{updated_cost_map, Enum.reduce(new_path, sorted_path, fn path, list -> merge_path_into_list(list, path) end )}
 	end
 
-	def find_path_rec(data_map, to, paths, interation, best, cost_map) do
+	def find_path_rec(data_map, to, paths, interation, best, cost_map, data_map_size) do
 		#interation |> IO.inspect(label: "interation")
 		#hd(paths)|> IO.inspect(label: "best path")
-	  {updated_cost_map, new_path} = find_path(data_map, paths, cost_map)
+	  {updated_cost_map, new_path} = find_path(data_map, paths, cost_map, data_map_size)
 
 		# Are we there?
 		sorted_path = sort_path(new_path, to)
 
 		new_best = hd(sorted_path)
 		best = if new_best != best do
-			{best_cost, best_path} = new_best
-			if rem(interation, 100) == 0 do
-				IO.puts("New best at iter #{interation} is #{best_cost} #{inspect(best_path)}")
+			{best_cost, best_path, len} = new_best
+			if rem(interation, 1000) == 0 do
+				IO.puts("New best at iter #{interation} is #{best_cost} #{inspect(best_path)} with len #{len}")
 			end
 			new_best
     else
@@ -166,10 +163,10 @@ defmodule Day15 do
     end
 
 		#	Enum.sort(new_path, fn {c1, _}, {c2, _} -> c1 < c2 end)
-		path_hit = Enum.find(sorted_path, fn {_, visited_field} -> visited_field == to end)
+		path_hit = Enum.find(sorted_path, fn {_, visited_field, _} -> visited_field == to end)
 
 		if path_hit == nil do
-			find_path_rec(data_map, to, sorted_path, interation + 1, best, updated_cost_map)
+			find_path_rec(data_map, to, sorted_path, interation + 1, best, updated_cost_map, data_map_size)
 		else
 			path_hit
 		end
@@ -180,7 +177,12 @@ input = File.stream!(filename) |> Enum.map(&String.trim/1) |> IO.inspect(label: 
 data_map = DataMap.create(input) |> IO.inspect(label: "Data Map")
 {max_x, max_y} = DataMap.get_size(data_map) |> IO.inspect(label: "Map Size")
 
-Day15.find_path_rec(data_map, {max_x, max_y}, [{0, {0,0}}], 1, nil, Map.new()) |> IO.inspect(label: "Result Part 1")
+Day15.find_path_rec(data_map, {max_x, max_y}, [{0, {0,0}, 0}], 1, nil, Map.new(), {max_x, max_y}) |> IO.inspect(label: "Result Part 1")
+
+
+#Day15.find_path_rec(data_map, {10, 10}, [{0, {0,0}, 0}], 1, nil, Map.new(), {max_x, max_y}) |> IO.inspect(label: "Result Part 1")
+
+
 
 
 #import ExUnit.Assertions
